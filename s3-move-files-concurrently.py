@@ -1,3 +1,13 @@
+######################################################################
+#
+# Skrypt przenosi podaną listę plików z jednego bukietu S3 do innego
+#
+# Podczas nieoczekiwanego błędu podczas wykonywania skryptu nie
+# dojdzie do utraty danych, typu usunięcie pliku bez uprzedniego
+# przekopiowania go do bukietu docelowego.
+#
+######################################################################
+
 import boto3
 import sys
 import subprocess
@@ -7,24 +17,25 @@ from multiprocessing import Pool
 s3_resource = boto3.resource('s3')
 s3 = boto3.client('s3')
 
+
 # parameters
 fileExtension = '.mp4'
 storageClass = 'STANDARD'
-sourceBucket = 'momentum-s3-test-kamil-dembkowski'
-destinationBucket = 'momentum-s3-test2-kamil-dembkowski'
+sourceBucket = 'myproduction-bucket'
+destinationBucket = 'mytest-bucket'
 pathPrefix = 'store/'
 maxPerPageItemsNumber = 1000
 numberOfConcurrentlyCopiedFiles = 16
 
 
 # multiprocessing
-def copy_single_file(fileName):
-    """
-    Helper function to copy a single file
-    """
+def move_single_file(fileName):
+    '''
+    Helper function to move a single file
+    '''
     
-    sBucket = 'momentum-s3-test-kamil-dembkowski'
-    dBucket = 'momentum-s3-test2-kamil-dembkowski'
+    sBucket = sourceBucket
+    dBucket = destinationBucket
        
     try:
         s3.copy_object(
@@ -37,19 +48,27 @@ def copy_single_file(fileName):
             )
     
     except Exception as e:
-        print(f"Error copying {fileName} to {fileName}: {e}")
+        print(f"Error copying {sourceBucket} + {pathPrefix} + {fileName} to {destinationBucket} + {pathPrefix} + {fileName}: {e}")
+    
+    try:
+        s3.delete_object(
+            Bucket = sBucket,
+            Key = fileName
+    )
+    
+    except Exception as e:
+        print(f"Error deleting {sourceBucket} + {pathPrefix} + {fileName} to {destinationBucket} + {pathPrefix} + {fileName}: {e}")
 
 
-
-def copy_files_concurrently(fileNames, numberOfWorkers):
-    """
+def move_files_concurrently(fileNames, numberOfWorkers):
+    '''
     Function to copy multiple files using multiprocessing for faster execution.
-    """
+    '''
     
     with Pool(processes = numberOfWorkers) as pool:
-        pool.map(copy_single_file, fileNames)
+        pool.map(move_single_file, fileNames)
     
-    print("All files copied successfully.")
+    print("All files moved successfully.")
 
 
 #pagination
@@ -64,5 +83,4 @@ for page in paginator.paginate(Bucket = sourceBucket, Prefix = pathPrefix, Pagin
             if ((objectS3['Key'].endswith(fileExtension)) and (objectS3['StorageClass'] == storageClass)):
                 fileNames.append(objectS3['Key'])
     
-    copy_files_concurrently(fileNames, numberOfConcurrentlyCopiedFiles)
-    
+    move_files_concurrently(fileNames, numberOfConcurrentlyCopiedFiles)
