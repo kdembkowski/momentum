@@ -36,20 +36,19 @@ def move_single_file(fileName):
     
     sBucket = sourceBucket
     dBucket = destinationBucket
-       
+    
+    # multipart copy of one file (supports file size bigger than 5GB)       
     try:
-        s3.copy_object(
-            Bucket = dBucket,
-            Key = fileName,
-                CopySource = {
-                    'Bucket': sBucket,
-                    'Key': fileName
-                    }
-            )
+        CopySource = {
+            'Bucket': sBucket,
+            'Key': fileName
+        }
+        s3_resource.meta.client.copy(CopySource, destinationBucket, fileName)
     
     except Exception as e:
-        print(f"Error copying {sourceBucket} + {pathPrefix} + {fileName} to {destinationBucket} + {pathPrefix} + {fileName}: {e}")
+        print(f"Error copying {sourceBucket}/{fileName} to {destinationBucket}/{fileName}: {e}")
     
+    # deleting one file
     try:
         s3.delete_object(
             Bucket = sBucket,
@@ -57,9 +56,10 @@ def move_single_file(fileName):
     )
     
     except Exception as e:
-        print(f"Error deleting {sourceBucket} + {pathPrefix} + {fileName} to {destinationBucket} + {pathPrefix} + {fileName}: {e}")
+        print(f"Error deleting {sourceBucket}/{fileName} to {destinationBucket}/{fileName}: {e}")
 
 
+# utilize more cpu cores
 def move_files_concurrently(fileNames, numberOfWorkers):
     '''
     Function to copy multiple files using multiprocessing for faster execution.
@@ -71,7 +71,7 @@ def move_files_concurrently(fileNames, numberOfWorkers):
     print("All files moved successfully.")
 
 
-#pagination
+# pagination (supports listing more than 5000 objects)
 paginator = s3.get_paginator('list_objects_v2')
 
 for page in paginator.paginate(Bucket = sourceBucket, Prefix = pathPrefix, PaginationConfig = {'PageSize': maxPerPageItemsNumber}):
@@ -84,3 +84,5 @@ for page in paginator.paginate(Bucket = sourceBucket, Prefix = pathPrefix, Pagin
                 fileNames.append(objectS3['Key'])
     
     move_files_concurrently(fileNames, numberOfConcurrentlyCopiedFiles)
+
+
