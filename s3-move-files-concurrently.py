@@ -34,13 +34,10 @@ def move_single_file(fileName):
     Helper function to move a single file
     '''
     
-    sBucket = sourceBucket
-    dBucket = destinationBucket
-    
     # multipart copy of one file (supports file size bigger than 5GB)       
     try:
         CopySource = {
-            'Bucket': sBucket,
+            'Bucket': sourceBucket,
             'Key': fileName
         }
         s3_resource.meta.client.copy(CopySource, destinationBucket, fileName)
@@ -51,7 +48,7 @@ def move_single_file(fileName):
     # deleting one file
     try:
         s3.delete_object(
-            Bucket = sBucket,
+            Bucket = sourceBucket,
             Key = fileName
     )
     
@@ -79,9 +76,9 @@ for page in paginator.paginate(Bucket = sourceBucket, Prefix = pathPrefix, Pagin
     fileNames = []
     
     if 'Contents' in page:
-        for objectS3 in page['Contents']:
-            if ((objectS3['Key'].endswith(fileExtension)) and (objectS3['StorageClass'] == storageClass)):
-                fileNames.append(objectS3['Key'])
+        for file in page['Contents']:
+            if ((file['Key'].endswith(fileExtension)) and (file['StorageClass'] == storageClass)):
+                fileNames.append(file['Key'])
     
     move_files_concurrently(fileNames, numberOfConcurrentlyCopiedFiles)
 
